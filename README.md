@@ -1,219 +1,163 @@
 # paper2code
 
-> **arxiv URL in → citation-anchored implementation out**
+> **arXiv URL in -> translation-pipeline research note, ambiguity audit, and prototype direction out**
 
-```
-┌─────────────────────────────┐         ┌──────────────────────────────────────┐
-│                             │         │  {paper_slug}/                       │
-│  /paper2code                │         │  ├── README.md                       │
-│  https://arxiv.org/abs/     │  ───▶   │  ├── REPRODUCTION_NOTES.md          │
-│  1706.03762                 │         │  ├── requirements.txt               │
-│                             │         │  ├── src/                            │
-│                             │         │  │   ├── model.py     # §3.2 cited  │
-│                             │         │  │   ├── loss.py      # §3.4 cited  │
-│                             │         │  │   ├── train.py     # §4.1 cited  │
-│                             │         │  │   ├── data.py                    │
-│                             │         │  │   ├── evaluate.py                │
-│                             │         │  │   └── utils.py                   │
-│                             │         │  ├── configs/                        │
-│                             │         │  │   └── base.yaml   # all params   │
-│                             │         │  └── notebooks/                      │
-│                             │         │      └── walkthrough.ipynb           │
-└─────────────────────────────┘         └──────────────────────────────────────┘
-```
+This fork is tuned for Laufey's Icelandic-to-English translation work, not generic benchmark reproduction.
 
-*[placeholder: animated GIF showing the full pipeline — paper fetch → parsing → ambiguity audit → code generation → walkthrough notebook]*
+The base `paper2code` idea is still intact: extract what a paper actually specifies, surface what it leaves vague, and only then write code. The difference is the target. Instead of defaulting to a standalone ML reproduction repo, this fork defaults to research and discovery outputs that are directly actionable for the translation pipeline.
 
----
+## Why this fork exists
 
-## Why this exists
+The translation pipeline already has real operational constraints:
 
-**The problem:** ML papers are vague. Critical hyperparameters are buried in appendices or omitted entirely. Prose contradicts equations. "Standard settings" refers to nothing specific. When you implement a paper, you spend more time detective-working than coding.
+- memoQ bilingual `.docx` handling
+- termbase-backed terminology control
+- number and identifier preservation
+- inline tag preservation
+- legal and regulatory style constraints
+- human review gates before delivery
 
-**What LLMs get wrong:** Naive code generation fills in every gap silently and confidently. You get something that runs but doesn't match the paper. Worse, you can't tell which parts are from the paper and which were invented by the model.
+Most papers are not written with those constraints in mind. A generic paper-to-code workflow is useful, but it still leaves a gap between "interesting paper" and "something worth testing in production."
 
-**What paper2code does differently:**
+This fork closes that gap by asking a different first question:
 
-1. **Citation anchoring** — every line of generated code references the exact paper section and equation it implements (`§3.2, Eq. 4`)
-2. **Ambiguity auditing** — before writing a single line of code, every implementation choice is classified as `SPECIFIED`, `PARTIALLY_SPECIFIED`, or `UNSPECIFIED`
-3. **Honest uncertainty** — unspecified choices are flagged with `[UNSPECIFIED]` comments at the exact line where the choice is made, with common alternatives listed
-4. **Appendix mining** — appendices, footnotes, and figure captions are treated as first-class sources, not ignored
+**How does this paper help the translation pipeline, and what is the smallest credible experiment to prove it?**
 
-The result: code you can trust because you can verify every decision against the paper.
+## What this fork does differently
 
----
+1. **Research-first default**
 
-## Install
+   The default output is `discovery`, not a full reproduction. The skill produces a vault-ready literature note, a paper-grounded ambiguity audit, and a prototype recommendation before it writes substantial code.
 
-```bash
-npx skills add PrathamLearnsToCode/paper2code/skills/paper2code
-```
+2. **Translation-pipeline touchpoint mapping**
 
-You'll be prompted to:
-1. **Select agents** — pick the coding agents you want to use this skill with (e.g., Claude Code)
-2. **Choose scope** — Global (recommended) or project-level
-3. **Choose method** — Symlink (recommended) or copy
+   Every paper is mapped to one or more real pipeline areas:
 
-Once installed, open your agent and run the skill:
+   - intake and document parsing
+   - chunking and outline generation
+   - terminology extraction and termbase work
+   - translation prompting and routing
+   - memoQ bilingual batch handling
+   - QA and validators
+   - formatting and delivery
+   - research memory and discovery
 
-```bash
-claude  # or your preferred agent
-```
+3. **Two-repo output model**
 
----
+   Research artifacts go to the ops repo. Human-readable notes go to the vault.
+
+   - Ops artifacts: `translation-pipeline/data/paper2code/{paper_slug}/`
+   - Vault note: `Laufey-verse/Efforts/Projects/Literature Notes/{date}-{paper-title}.md`
+
+   When available, the skill reads `translation-pipeline/config/paths.yml` and uses those configured paths instead of hardcoded guesses.
+
+4. **Prototype discipline**
+
+   The skill does not default to building a full training repo. It recommends the smallest useful prototype that can plug into the existing pipeline and names the likely integration point.
+
+5. **Operational evaluation lens**
+
+   Papers are evaluated against the concerns that matter in this repo:
+
+   - terminology fidelity
+   - DNT and identifier safety
+   - tag integrity
+   - numeric consistency
+   - legal and regulatory tone
+   - auditability and reviewer ergonomics
 
 ## Usage
 
-### Basic — generate a minimal implementation
+### Discovery mode (default)
 
-```
+```text
 /paper2code https://arxiv.org/abs/1706.03762
 ```
 
-### Specify framework
+Produces:
 
-```
-/paper2code https://arxiv.org/abs/2006.11239 --framework jax
-```
+- a literature note for the vault
+- `research_summary.md`
+- `REPRODUCTION_NOTES.md`
+- `prototype_plan.md`
 
-### Full mode — includes training loop and data pipeline
+### Prototype mode
 
-```
-/paper2code 2106.09685 --mode full
-```
-
-### Educational mode — extra comments and pedagogical notebook
-
-```
-/paper2code https://arxiv.org/abs/2010.11929 --mode educational
+```text
+/paper2code https://arxiv.org/abs/1706.03762 --mode prototype
 ```
 
-### Using bare arxiv ID
+Adds a minimal scaffold only for the most relevant pipeline touchpoint.
 
-```
-/paper2code 1706.03762
+### Full mode
+
+```text
+/paper2code https://arxiv.org/abs/1706.03762 --mode full --framework torch
 ```
 
----
+Generates a broader scaffold when the paper maps cleanly to a concrete implementation path.
+
+### Educational mode
+
+```text
+/paper2code 2006.11239 --mode educational
+```
+
+Same as prototype or full, but with extra explanatory notes.
 
 ## What you get
 
-```
-attention_is_all_you_need/
-├── README.md                    # Paper summary, contribution statement, quick-start
-├── REPRODUCTION_NOTES.md        # Ambiguity audit, unspecified choices, known deviations
-├── requirements.txt             # Pinned dependencies
-├── src/
-│   ├── model.py                 # Architecture — every layer cited to paper section
-│   ├── loss.py                  # Loss functions with equation references
-│   ├── data.py                  # Dataset class skeleton with preprocessing TODOs
-│   ├── train.py                 # Training loop (if in scope)
-│   ├── evaluate.py              # Metric computation code
-│   └── utils.py                 # Shared utilities (masking, positional encoding, etc.)
-├── configs/
-│   └── base.yaml                # All hyperparams — each one cited or flagged [UNSPECIFIED]
-└── notebooks/
-    └── walkthrough.ipynb        # Pedagogical notebook linking paper sections → code → sanity checks
+```text
+translation-pipeline/data/paper2code/{paper_slug}/
+├── README.md
+├── research_summary.md
+├── REPRODUCTION_NOTES.md
+├── prototype_plan.md
+├── requirements.txt            # prototype/full only
+├── src/                        # prototype/full only
+│   ├── model.py
+│   ├── loss.py
+│   ├── data.py
+│   ├── train.py
+│   ├── evaluate.py
+│   └── utils.py
+└── configs/
+    └── base.yaml
+
+Laufey-verse/Efforts/Projects/Literature Notes/
+└── {YYYY-MM-DD}-{paper-title}.md
 ```
 
-### Key files explained
+### Key files
 
 | File | Purpose |
 |------|---------|
-| `model.py` | Architecture only. Each class maps to a paper section. Variable names match paper notation. |
-| `REPRODUCTION_NOTES.md` | The ambiguity audit. Lists every choice, whether the paper specified it, and what alternatives exist. |
-| `base.yaml` | Single source of truth for all hyperparameters. |
-| `walkthrough.ipynb` | Runnable on CPU with toy dimensions. Quotes paper passages, shows corresponding code, runs shape checks. |
+| `research_summary.md` | Why the paper matters, which pipeline touchpoints it affects, and whether it is worth prototyping |
+| `REPRODUCTION_NOTES.md` | Explicit audit of what the paper specifies, omits, or conflicts on |
+| `prototype_plan.md` | Smallest credible experiment for the translation pipeline |
+| Vault note | Durable research note with links back to the ops artifacts |
 
----
+## What this fork will not do
 
-## What this skill will NOT do
+- It will not pretend every paper deserves code.
+- It will not silently fill in missing details.
+- It will not recommend architecture work without naming the existing pipeline module it should touch.
+- It will not optimize for leaderboard replication if the paper has weak operational fit.
+- It will not bypass human-review concerns such as terminology approval, memoQ compatibility, or QA gates.
 
-- **Won't guarantee correctness.** The implementation matches what the paper describes. If the paper is wrong, the code is wrong. If the paper is vague, the code flags it.
-- **Won't invent details.** If the paper doesn't specify a hyperparameter, the code uses a common default and marks it `[UNSPECIFIED]`. It will never silently fill in gaps.
-- **Won't download datasets.** The `data.py` provides a `Dataset` class skeleton with clear instructions on where to get the data and how to preprocess it.
-- **Won't set up training infrastructure.** No distributed training, no experiment tracking, no checkpointing beyond what the paper's contribution requires.
-- **Won't implement baselines.** Only the core contribution of the paper is implemented.
-- **Won't reimplement standard components.** If the paper says "standard transformer encoder," the code imports it or notes the dependency — it doesn't reimplement attention from scratch.
+## Repo layout
 
----
-
-## Design principles
-
-### Citation anchoring convention
-
-Every non-trivial code decision is anchored to the paper:
-
-```python
-# §3.2 — "We apply layer normalization before each sub-layer" (Pre-LN variant)
-class TransformerBlock(nn.Module):
-    def forward(self, x):
-        # §3.2, Eq. 2 — attention_weights = softmax(QK^T / sqrt(d_k))
-        attn_out = self.attention(self.norm1(x))  # (batch, seq_len, d_model)
-        x = x + attn_out  # §3.2 — residual connection
-```
-
-### The UNSPECIFIED flag system
-
-```python
-# [UNSPECIFIED] Paper does not state epsilon for LayerNorm — using 1e-6 (common default)
-# Alternatives: 1e-5 (PyTorch default), 1e-8 (some implementations)
-self.norm = nn.LayerNorm(d_model, eps=1e-6)
-```
-
-```python
-# [ASSUMPTION] Using pre-norm based on "we found pre-norm more stable" in §4.1
-# The paper uses post-norm in Figure 1 but pre-norm in experiments — ambiguous
-```
-
-### Ambiguity classification
-
-| Tag | Meaning |
-|-----|---------|
-| `§X.Y` | Directly specified in paper section X.Y |
-| `§X.Y, Eq. N` | Implements equation N from section X.Y |
-| `[UNSPECIFIED]` | Paper does not state this — our choice with alternatives listed |
-| `[PARTIALLY_SPECIFIED]` | Paper mentions this but is ambiguous — quote included |
-| `[ASSUMPTION]` | Reasonable inference from paper context — reasoning explained |
-| `[FROM_OFFICIAL_CODE]` | Taken from the authors' official implementation |
-
----
-
-## Contributing
-
-### Adding worked examples
-
-Worked examples are the most trust-building part of this project. To add one:
-
-1. Pick a well-known paper (people should be able to verify the output)
-2. Run the skill: `/paper2code https://arxiv.org/abs/XXXX.XXXXX`
-3. Save the full output to `skills/paper2code/worked/{paper_slug}/`
-4. Write a `review.md` that honestly evaluates:
-   - What the skill got right
-   - What it correctly flagged as unspecified
-   - Any mistakes it made
-   - Any edge cases it handled well or poorly
-5. Submit a PR with all of the above
-
-### Improving guardrails
-
-If you find a pattern where the skill hallucinates or makes a silent assumption, add it to the appropriate file in `guardrails/`.
-
-### Adding domain knowledge
-
-If papers in your subfield consistently reference components that the skill doesn't know about (e.g., graph neural network primitives, RL components), add a knowledge file in `knowledge/`.
-
----
+- `skills/paper2code/SKILL.md`
+  The main workflow, rewritten for translation-pipeline research and discovery.
+- `skills/paper2code/references/translation_pipeline_research.md`
+  The evaluation lens for pipeline fit.
+- `skills/paper2code/references/ambiguity-patterns.md`
+  The ambiguity taxonomy used during auditing.
+- `skills/paper2code/scripts/`
+  Helper scripts for paper retrieval and structure extraction.
+- `skills/paper2code/worked/`
+  Older worked examples from the generic paper-to-code workflow. Still useful as quality references.
 
 ## Worked examples
 
-This repo includes fully worked examples to demonstrate output quality:
-
-| Paper | Type | Command |
-|-------|------|---------|
-| Attention Is All You Need (1706.03762) | Architecture | `/paper2code https://arxiv.org/abs/1706.03762` |
-| DDPM (2006.11239) | Training method | `/paper2code https://arxiv.org/abs/2006.11239` |
-
-Each includes the complete generated output plus an honest `review.md` evaluating what the skill got right and wrong.
-
----
+The repo still includes worked examples such as Attention Is All You Need and DDPM. They remain useful as trust-building examples, but this fork now treats them as examples of citation discipline rather than the default shape of every output.
