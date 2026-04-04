@@ -1,194 +1,135 @@
-# Guardrail: Hallucination Prevention
+# Guardrail: Evidence Discipline
 
 ## The core problem
 
-The single most dangerous failure mode of paper2code is **confident invention** — generating code that looks plausible but implements details the paper never specified, without flagging them. A researcher who trusts this output will waste days debugging differences that exist because the model guessed.
+The dangerous failure mode in this fork is not invented code. It is **invented applicability**.
 
-This file exists to prevent that. Read it before every code generation stage. Internalize it.
+A paper can be strong and still be a bad fit for the translation-pipeline. A paper can also be weak, incomplete, or only indirectly relevant while still sounding impressive.
 
----
-
-## The bright line rule
-
-**If a detail is not explicitly stated in the paper text, the appendix, the paper's official GitHub repository, or a well-known replication paper — it is UNSPECIFIED.**
-
-Not "probably this." Not "standard practice." Not "everyone uses." **UNSPECIFIED.**
+This file exists to stop that drift.
 
 ---
 
-## What counts as "stated in the paper"
+## Bright-line rule
 
-### Counts as SPECIFIED:
-- Direct statement: "We use d_model = 512" → SPECIFIED
-- Table entry: Table 3 shows "learning rate: 3e-4" → SPECIFIED
-- Equation: Eq. 4 defines the loss function → SPECIFIED (for the equation, not for implementation details like numerical precision)
-- Algorithm box: Algorithm 1 lines 3-5 describe the update rule → SPECIFIED
-- Footnote: Footnote 3 says "we clip gradients at 1.0" → SPECIFIED
-- Appendix: Appendix B Table 6 shows "warmup steps = 4000" → SPECIFIED
+**If the paper does not show evidence for a claim in a setting meaningfully related to the translation-pipeline, that claim is not established for this workflow.**
 
-### Does NOT count as SPECIFIED:
-- "We use standard optimization" → **UNSPECIFIED** (standard according to whom? which optimizer? what hyperparameters?)
-- "Following prior work [23]" → **PARTIALLY_SPECIFIED** (you must look up [23] and report what it says, or flag that the reader needs to)
-- "We use Adam" → **PARTIALLY_SPECIFIED** (Adam has β₁, β₂, ε parameters — are they stated?)
-- "Similar architecture to [X]" → **PARTIALLY_SPECIFIED** (similar is not identical — what differs?)
-- "Standard hyperparameters" → **UNSPECIFIED**
-- "Default settings" → **UNSPECIFIED** (whose defaults? PyTorch? TensorFlow? They differ.)
-- Descriptions in related work of other people's methods → **NOT A SPECIFICATION OF THIS PAPER'S METHOD**
-- Blog posts, tweets, or talks by the authors → **NOT PEER-REVIEWED, note as supplementary only**
+Do not upgrade:
+
+- sentence-level evidence into document-level evidence
+- high-resource language evidence into Icelandic evidence
+- academic benchmark gains into legal/regulatory deliverable gains
+- official code into operational readiness
 
 ---
 
-## The UNSPECIFIED comment protocol
+## What counts as evidence
 
-When you make a choice for an UNSPECIFIED item, the code comment must have three parts:
+### Counts as strong evidence
 
-```python
-# [UNSPECIFIED] {What the paper doesn't specify}
-# Using: {your choice}
-# Alternatives: {other reasonable choices}
-```
+- evaluation on document translation when the claim is document handling
+- human evaluation with clear rubric
+- terminology or consistency evaluation when the method claims those gains
+- ablations showing the claimed component matters
+- official code that aligns with the paper and resolves missing implementation detail
 
-Example:
-```python
-# [UNSPECIFIED] Paper does not state activation function in the feed-forward network
-# Using: GELU (most common in recent transformer implementations)
-# Alternatives: ReLU (original transformer), SiLU/Swish (used in LLaMA, PaLM)
-self.activation = nn.GELU()
-```
+### Does not count as strong evidence
 
-You must NEVER write just:
-```python
-self.activation = nn.GELU()  # standard choice
-```
-This hides the fact that the paper didn't specify it.
+- generic BLEU improvement with no document or domain relevance
+- "state of the art" without a meaningful baseline for this use case
+- examples cherry-picked in the paper
+- official code with no usable evaluation setup
+- claims that rely on private data, unpublished prompts, or omitted preprocessing
 
 ---
 
-## Equation ground truth rule
+## Inference discipline
 
-Equations are more precise than prose. If the prose description and the equation conflict:
+You may make inferences, but label them as inferences.
 
-1. Implement the equation
-2. Flag the discrepancy explicitly:
+Examples:
 
-```python
-# §3.2, Eq. 4 — loss = -log(exp(sim(z_i, z_j)/τ) / Σ_k exp(sim(z_i, z_k)/τ))
-# NOTE: The prose in §3.2 says "we average over all positive pairs" but Eq. 4
-# sums rather than averages. We implement Eq. 4 as written.
-```
+- "This might transfer to bilingual memoQ documents because the method is layout-aware" is an inference.
+- "This improves memoQ output quality" is not allowed unless the paper shows something close to that.
 
-This applies even when the equation is clearly a typo. Implement the equation, flag the likely typo, and add a comment about what the authors probably meant.
+Whenever you infer, name the missing evidence.
 
 ---
 
-## The "standard" trap
+## Common traps
 
-Papers frequently use the word "standard" without definition. Here's what to do:
+### The benchmark trap
 
-| Paper says | What to do |
-|-----------|------------|
-| "standard transformer" | Ask: which transformer? Pre-norm? Post-norm? How many layers? Flag as UNSPECIFIED unless the paper cites a specific architecture |
-| "standard augmentation" | Ask: which augmentations? Random crop size? Flip probability? Color jitter parameters? Flag as UNSPECIFIED |
-| "standard preprocessing" | Ask: what tokenizer? What normalization? What sequence length? Flag as UNSPECIFIED |
-| "standard evaluation" | Ask: which metric implementation? What post-processing? Flag as UNSPECIFIED |
-| "we follow standard practice" | This means nothing. Flag as UNSPECIFIED. |
+The paper reports better COMET, BLEU, or chrF.
 
----
+Questions you must ask:
 
-## The number precision trap
+- On what domain?
+- On what languages?
+- Sentence or document level?
+- Any human evaluation?
+- Any terminology or consistency measurement?
 
-Do not silently change numbers:
+If those answers are weak, downgrade confidence.
 
-- If the paper says 512, use 512 — not 256 "for simplicity" without flagging it
-- If the paper says 0.9, use 0.9 — not 0.99 because "that's what people usually use"
-- If the paper says 100k steps, use 100000 — not 50000 because "it should converge faster"
+### The language-pair trap
 
-Any deviation from stated numbers must be flagged:
-```python
-# §5.2 states d_model = 512, but this walkthrough uses d_model = 64 for CPU execution
-# Set d_model = 512 for actual reproduction
-```
+Most papers are not about Icelandic. That is fine. But if morphology, terminology, or data scale matter, say the transfer risk out loud.
 
----
+### The document-fidelity trap
 
-## The initialization trap
+A paper can improve translation quality while being irrelevant to:
 
-Weight initialization is almost never specified in papers but matters enormously. If the paper does not specify initialization:
+- tags
+- bilingual alignment
+- table structure
+- number preservation
+- legal formatting
 
-```python
-# [UNSPECIFIED] Paper does not describe weight initialization
-# Using: PyTorch defaults (Kaiming uniform for Linear, uniform for Embedding)
-# Alternatives: Xavier uniform (common for transformers), normal init with std=0.02
-# NOTE: Initialization can significantly affect training stability and convergence
-```
+That gap matters here.
 
-If the paper specifies initialization (rare but valuable), implement it exactly and cite the section.
+### The official-code trap
+
+Official code helps with reproducibility. It does not prove:
+
+- production fit
+- domain fit
+- evaluator fit
+- maintainability in the current pipeline
 
 ---
 
-## The framework translation trap
+## Prohibited phrasing
 
-Different frameworks have different defaults that papers don't always clarify:
+Do not write:
 
-### Batch normalization momentum
-- Paper says `momentum = 0.1`
-- PyTorch BatchNorm uses `momentum = 0.1` (but its definition is inverted: `running_mean = (1 - momentum) * running_mean + momentum * batch_mean`)
-- TensorFlow BatchNorm uses `momentum = 0.99` (with convention: `running_mean = momentum * running_mean + (1 - momentum) * batch_mean`)
-- PyTorch `momentum=0.1` ≈ TensorFlow `momentum=0.9`
-- **Always clarify which convention the paper uses**
+- "drop-in improvement"
+- "production-ready"
+- "clearly better for our pipeline"
+- "should generalize"
+- "probably works here"
 
-### Dropout rate vs keep probability
-- Paper says "dropout 0.1" — does this mean drop probability = 0.1 or keep probability = 0.1?
-- Almost always means drop probability = 0.1 (keep = 0.9), but older papers sometimes use keep probability
-- PyTorch `nn.Dropout(p=0.1)` means drop probability = 0.1
-
-### Layer normalization epsilon
-- Papers almost never specify this
-- PyTorch default: 1e-5
-- Common in papers: 1e-6
-- Some implementations: 1e-8
-- **Flag as UNSPECIFIED and note which you chose**
+unless the paper actually supports that claim.
 
 ---
 
-## The "we found" trap
+## Required phrasing for uncertainty
 
-When a paper says "we found that X works better," this is usually an empirical observation, not a derived result. Treat it as useful information but note that:
-- "Better" often means "better for our specific setup/dataset/scale"
-- The alternative (not-X) might work fine for different scenarios
-- This is an [ASSUMPTION] not a [SPECIFIED] item when you implement it as the default
+Use direct language like:
 
----
-
-## Prohibited phrases in generated code
-
-Never write any of these in code comments:
-- "standard practice" (without specifying what practice)
-- "as usual" (usual for whom?)
-- "obviously" (if it's obvious, you don't need to say it; and it's probably not obvious)
-- "typically" (without a citation)
-- "it's well known that" (without a citation)
-- "for simplicity" (as justification for deviating from the paper)
-- "should work" (either it's specified or it isn't)
-
----
-
-## The official code shortcut
-
-If official code exists:
-1. Note its URL in REPRODUCTION_NOTES.md
-2. You may use it to resolve UNSPECIFIED items — but:
-   - Mark them as `[FROM_OFFICIAL_CODE]`, not as `SPECIFIED`
-   - The official code may differ from the paper (bug fixes, improvements, errors)
-   - Link to the exact line: `github.com/author/repo/blob/main/model.py#L42`
-3. Do NOT copy-paste code. Read the official code to understand the choice, then implement it yourself with a citation
+- "Not shown in the paper"
+- "Unclear whether this transfers to legal/regulatory IS->EN documents"
+- "Evidence is sentence-level only"
+- "No formatting or tag-integrity evidence"
+- "Requires prototype to answer"
 
 ---
 
 ## Self-audit questions
 
-Before finishing any code generation, ask yourself:
-1. If I removed all my `[UNSPECIFIED]` comments, would a reader think the paper specified everything? If yes, I'm probably missing flags.
-2. Did I add any implementation detail from my own ML knowledge without checking if the paper says it? Flag it.
-3. Would the authors of this paper agree that my code matches their description? If I'm not sure, something needs a flag.
-4. Is there a single magic number anywhere without a citation or `[UNSPECIFIED]` comment? Find it and fix it.
+Before finalizing:
+
+1. Did I confuse a promising idea with a validated fit?
+2. Did I upgrade weak domain match into strong relevance?
+3. Did I treat unavailable prompts, data, or code as minor omissions when they are actually blockers?
+4. Would a skeptical engineer agree that every recommendation is proportional to the evidence?
