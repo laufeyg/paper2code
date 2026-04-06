@@ -1,30 +1,44 @@
 ---
 name: paper2code
-description: Converts an arxiv paper into a minimal, citation-anchored Python implementation. Trigger when user runs /paper2code with an arxiv URL or paper ID, says "implement this paper", or pastes an arxiv link asking for implementation. Flags all ambiguities honestly. Never invents implementation details not stated in the paper.
+description: Converts an arxiv paper into a translation-pipeline research and discovery pack. Trigger when the user runs /paper2code with an arxiv URL or paper ID, asks whether a paper is relevant to the translation pipeline, or wants a paper turned into a decision-ready brief, evidence audit, experiment plan, and vault note.
 ---
 
-# paper2code — Orchestration
+# paper2code — Translation-Pipeline Research Orchestration
 
-You are executing the paper2code skill. This file governs the high-level flow. Each stage dispatches to a detailed reasoning protocol in `pipeline/`. Do NOT skip stages. Do NOT combine stages. Execute them in order.
+You are executing the `paper2code` skill for **translation-pipeline research and discovery**.
+
+Do not treat this as a paper-reproduction workflow. The goal is to help decide whether a paper is worth integrating into the IS->EN legal/regulatory translation pipeline, where it would fit, and what the smallest safe experiment should be.
+
+Execute the stages in order. Do not skip stages.
 
 ## Parse arguments
 
 Extract from the user's input:
-- `ARXIV_ID`: the arxiv paper ID (e.g., `2106.09685`). Strip any URL prefix.
+
+- `ARXIV_ID`: the arxiv paper ID. Strip any URL prefix.
 - `MODE`: one of `minimal` (default), `full`, `educational`.
-- `FRAMEWORK`: one of `pytorch` (default), `jax`, `numpy`.
 
 If the user provided a full URL like `https://arxiv.org/abs/2106.09685`, extract the ID `2106.09685`.
 If the user provided a versioned ID like `2106.09685v2`, keep the version.
 
 ## Set up working directory
 
-Create a temporary working directory: `.paper2code_work/{ARXIV_ID}/`
-This is where intermediate artifacts go. The final output goes in the current directory under `{paper_slug}/`.
+Create a temporary working directory:
+
+```text
+.paper2code_work/{ARXIV_ID}/
+```
+
+Use it for intermediate artifacts. The final output goes in the current directory under:
+
+```text
+{paper_slug}/
+```
 
 ## Install dependencies
 
 Run via Bash:
+
 ```bash
 pip install pymupdf4llm pdfplumber requests pyyaml
 ```
@@ -32,48 +46,82 @@ pip install pymupdf4llm pdfplumber requests pyyaml
 ## Execute pipeline
 
 ### Stage 1 — Paper Acquisition and Parsing
+
 Read and follow: `pipeline/01_paper_acquisition.md`
 
-Run the helper script to fetch and parse the paper:
+Run the helper scripts:
+
 ```bash
 python skills/paper2code/scripts/fetch_paper.py {ARXIV_ID} .paper2code_work/{ARXIV_ID}/
-```
-Then run structure extraction:
-```bash
 python skills/paper2code/scripts/extract_structure.py .paper2code_work/{ARXIV_ID}/paper_text.md .paper2code_work/{ARXIV_ID}/
 ```
-Verify the outputs exist before proceeding. If extraction failed, follow the fallback protocol in `pipeline/01_paper_acquisition.md`.
 
-The script also searches for official code repositories (in the paper text and on the arxiv page) and saves any found links to `paper_metadata.json` under the `official_code` key. Verify these links before relying on them — see Step 8 in `pipeline/01_paper_acquisition.md`.
+Verify the expected outputs exist before continuing.
 
-### Stage 2 — Contribution Identification
+### Stage 2 — Contribution and Relevance Identification
+
 Read and follow: `pipeline/02_contribution_identification.md`
 
-Read the parsed paper sections. Identify the single core contribution. Classify the paper type. Write the contribution statement. Save it to `.paper2code_work/{ARXIV_ID}/contribution.md`.
+Before writing anything, also read:
 
-### Stage 3 — Ambiguity Audit
-Read and follow: `pipeline/03_ambiguity_audit.md`
+- `knowledge/translation_pipeline_research.md`
 
-Before reading this stage, also read: `guardrails/hallucination_prevention.md`
+Identify what the paper actually contributes, what kind of paper it is, and whether it is directly relevant to the translation pipeline. Save the result to:
 
-Go through every implementation-relevant detail. Classify each as SPECIFIED, PARTIALLY_SPECIFIED, or UNSPECIFIED. Save the audit to `.paper2code_work/{ARXIV_ID}/ambiguity_audit.md`.
+```text
+.paper2code_work/{ARXIV_ID}/contribution.md
+```
 
-### Stage 4 — Code Generation
-Read and follow: `pipeline/04_code_generation.md`
+### Stage 3 — Evidence and Risk Audit
 
-Before writing code, read:
-- `guardrails/scope_enforcement.md` — to determine what's in and out of scope
-- `guardrails/badly_written_papers.md` — if the paper is vague or inconsistent
-- The relevant knowledge files in `knowledge/` for the paper's domain
-- The scaffold templates in `scaffolds/` for the expected file structure
+Read and follow: `pipeline/03_evidence_audit.md`
 
-Determine the `paper_slug` from the paper title (lowercase, underscores, no special chars).
-Generate all files under `{paper_slug}/` in the current working directory.
+Before working this stage, also read:
 
-### Stage 5 — Walkthrough Notebook
-Read and follow: `pipeline/05_walkthrough_notebook.md`
+- `guardrails/hallucination_prevention.md`
+- `guardrails/badly_written_papers.md`
+- `knowledge/translation_pipeline_research.md`
 
-Generate the walkthrough notebook that connects paper sections to code with runnable sanity checks. Save to `{paper_slug}/notebooks/walkthrough.ipynb`.
+Audit the paper's evidence, evaluation, reproducibility, domain fit, and missing details. Save the result to:
+
+```text
+.paper2code_work/{ARXIV_ID}/evidence_audit.md
+```
+
+### Stage 4 — Pipeline Fit and Experiment Design
+
+Read and follow: `pipeline/04_pipeline_fit_and_experiment_design.md`
+
+Before generating the final research pack, also read:
+
+- `guardrails/scope_enforcement.md`
+- `knowledge/translation_pipeline_research.md`
+- relevant files in `scaffolds/`
+
+Generate the final output directory:
+
+```text
+{paper_slug}/
+```
+
+The default output files are:
+
+- `README.md`
+- `EVIDENCE_AUDIT.md`
+- `PIPELINE_FIT.md`
+- `EXPERIMENT_PLAN.md`
+
+### Stage 5 — Vault Note Packaging
+
+Read and follow: `pipeline/05_vault_note_packaging.md`
+
+Generate:
+
+```text
+{paper_slug}/OBSIDIAN_NOTE.md
+```
+
+This note should be ready to drop into the vault with light edits.
 
 ## Cleanup
 
@@ -82,31 +130,39 @@ Remove the `.paper2code_work/` directory after successful completion.
 ## Final output
 
 Print a summary:
-```
-✓ paper2code complete for: {paper_title}
+
+```text
+✓ paper2code research pack complete for: {paper_title}
   Output directory: {paper_slug}/
-  Files generated: {list of files}
-  Unspecified choices: {count} (see REPRODUCTION_NOTES.md)
-  Mode: {MODE} | Framework: {FRAMEWORK}
+  Recommendation: {ADOPT NOW | PROTOTYPE | WATCHLIST | REJECT}
+  Critical unknowns: {count}
+  Suggested experiment count: {count}
+  Mode: {MODE}
 ```
 
 ## Mode-specific behavior
 
-- **minimal** (default): Core contribution only. Training loop only if contribution involves training. No data pipeline beyond Dataset skeleton.
-- **full**: Core contribution + full training loop + data pipeline + evaluation pipeline. More code, same citation rigor.
-- **educational**: Same as minimal but with extra inline comments explaining ML concepts, expanded walkthrough notebook with theory sections, and a `PAPER_GUIDE.md` that walks through the paper section by section.
+- `minimal`: concise decision brief, evidence audit, pipeline fit, and one bounded experiment
+- `full`: full research pack with deeper risk analysis, multiple experiments or rollout options when justified
+- `educational`: same as `full`, but written so a collaborator can understand the paper and the decision without reading the paper first
 
 ## Guardrails — always active
 
-These apply at ALL stages. Read them if you haven't already:
-- `guardrails/hallucination_prevention.md` — the most important file in this skill
-- `guardrails/scope_enforcement.md` — what to implement and what to skip
-- `guardrails/badly_written_papers.md` — what to do when the paper is unclear
+These apply at all stages:
+
+- `guardrails/hallucination_prevention.md`
+- `guardrails/scope_enforcement.md`
+- `guardrails/badly_written_papers.md`
 
 ## Knowledge base — consult as needed
 
-Before implementing any of these components, read the corresponding knowledge file:
-- Transformer layers, attention, positional encoding → `knowledge/transformer_components.md`
-- Optimizers, LR schedules, batch size semantics → `knowledge/training_recipes.md`
-- Cross-entropy, contrastive loss, diffusion loss, ELBO → `knowledge/loss_functions.md`
-- Framework-specific pitfalls, notation mismatches → `knowledge/paper_to_code_mistakes.md`
+Always read:
+
+- `knowledge/translation_pipeline_research.md`
+
+Use the original domain knowledge files only when the paper is deeply model- or training-heavy and the distinction matters for the research assessment:
+
+- `knowledge/transformer_components.md`
+- `knowledge/training_recipes.md`
+- `knowledge/loss_functions.md`
+- `knowledge/paper_to_code_mistakes.md`

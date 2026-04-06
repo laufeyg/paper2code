@@ -1,115 +1,151 @@
-# Stage 2: Contribution Identification
+# Stage 2: Contribution and Relevance Identification
 
 ## Purpose
-Before writing any code, you must understand exactly what this paper contributes and what "implementing this paper" means. This stage forces clarity. 
+
+Before deciding anything, understand what the paper actually contributes and whether that contribution matters for the translation-pipeline. This stage is about relevance, not hype.
 
 ## Input
+
 - Parsed paper sections from Stage 1
-- `paper_metadata.json` (includes `official_code` links if any were found)
+- `paper_metadata.json`
+- `knowledge/translation_pipeline_research.md`
 
 ## Output
-- `.paper2code_work/{ARXIV_ID}/contribution.md` — contains the contribution statement, paper classification, and implementation scope
+
+- `.paper2code_work/{ARXIV_ID}/contribution.md`
 
 ---
 
 ## Reasoning protocol
 
-### Step 1: Read the abstract and introduction 
+### Step 1: State the paper's contribution in one sentence
 
-First read: understand what the paper claims to do.
-Second read: identify the **single sentence** that states the core contribution. This is usually in the abstract ("We propose...," "We introduce...," "In this work, we...") or the last paragraph of the introduction ("Our contributions are...").
+Read the abstract and introduction twice.
 
-Tasks:
-- What is the ONE thing this paper does that didn't exist before?
-- If I had to explain this paper in 10 seconds to an ML engineer, what would I say?
-- What would be missing from ML if this paper didn't exist?
+Write a one-sentence answer to:
 
-Write this down as a one-sentence contribution statement.
+- What new thing does this paper claim to add?
+- Is that addition a method, dataset, evaluation practice, system trick, or prompt/process trick?
+- If this paper did not exist, what would be missing?
 
-### Step 2: Classify the paper type
+Do not write a generic summary. Write a precise contribution statement.
 
-Determine which category best fits. This directly affects what you implement:
+### Step 2: Classify the paper for translation-pipeline purposes
 
-#### (a) New architecture
-**Examples:** Transformer, ResNet, Vision Transformer, U-Net
-**What "implementing the core contribution" means:** The model architecture — layer definitions, forward pass, how components connect. The architecture IS the contribution.
-**Priority sections:** Model/Architecture section, Figure showing the architecture, any Algorithm boxes
-**What's secondary:** Training procedure (use standard), specific dataset preprocessing
+Pick the closest category:
 
-#### (b) New training method or loss function
-**Examples:** DDPM, SimCLR, RLHF, DPO
-**What "implementing the core contribution" means:** The training loop, the loss function, the optimization procedure. The model architecture is usually borrowed from existing work.
-**Priority sections:** Training/Objective section, loss function equations, Algorithm boxes describing the training procedure
-**What's secondary:** Model architecture (often standard), dataset specifics
+#### (a) Translation or adaptation method
+Examples:
+- MT decoding changes
+- document-level translation methods
+- context or retrieval for translation
+- post-editing or adaptation loops
 
-#### (c) New inference or generation technique
-**Examples:** Beam search variants, nucleus sampling, classifier-free guidance
-**What "implementing the core contribution" means:** The inference algorithm. There may be no training at all.
-**Priority sections:** Inference/Generation section, Algorithm boxes, any sampling or decoding procedures
-**What's secondary:** Training (none or standard), model architecture (usually pre-existing)
+Most relevant surfaces:
+- `src/prompts/translate.py`
+- `src/prompts/translate_bilingual.py`
+- batch or context handling
 
-#### (d) New dataset or benchmark
-**Examples:** ImageNet, GLUE, MMLU
-**What "implementing the core contribution" means:** The evaluation framework, metrics, data loading pipeline. There may be baseline models but they're not the contribution.
-**Priority sections:** Dataset description, evaluation methodology, metric definitions
-**What's secondary:** Baseline model architectures (reference only)
+#### (b) Terminology or lexicon method
+Examples:
+- term extraction
+- lexicon induction
+- constrained terminology insertion
+- glossary enforcement
 
-#### (e) Theoretical analysis with empirical validation
-**Examples:** Lottery Ticket Hypothesis, Scaling Laws
-**What "implementing the core contribution" means:** The experimental setup that validates the theory. Often involves running specific experiments with specific measurements.
-**Priority sections:** Experimental setup, what is measured and how, specific procedures
-**What's secondary:** The theory proofs (important to understand but not to implement)
+Most relevant surfaces:
+- `src/db/termbase.py`
+- term normalization/import flows
+- prompt glossary construction
 
-#### (f) System or engineering paper
-**Examples:** Megatron-LM, FlashAttention, vLLM
-**What "implementing the core contribution" means:** The system design — often involves low-level optimizations, custom kernels, or infrastructure.
-**Priority sections:** System design section, performance benchmarks, implementation details
-**Note:** These papers often cannot be reproduced in a minimal implementation because the contribution IS the engineering. Flag this honestly.
+#### (c) Document structure or chunking method
+Examples:
+- layout understanding
+- section-aware chunking
+- structure-aware translation
+- bilingual alignment
 
-### Step 3: Find the Algorithm box
+Most relevant surfaces:
+- outline/chunk creation
+- `src/bilingual/segment.py`
+- `src/bilingual/batcher.py`
 
-Search the paper for formal algorithm descriptions (usually labeled "Algorithm 1," "Algorithm 2," etc.). These are gold:
+#### (d) Quality estimation or validation method
+Examples:
+- QE
+- hallucination detection
+- adequacy/consistency checks
+- terminology or numeric consistency checks
 
-- They are the most precise specification of the procedure
-- They resolve ambiguities in prose descriptions
-- They define variable names and control flow explicitly
-- If the prose says one thing and the Algorithm box says another, **implement the Algorithm box** and flag the discrepancy
+Most relevant surfaces:
+- `src/validators/`
+- Stage 8 QA
+- bilingual validation before delivery
 
-If there is no Algorithm box, note this — it means the implementation will rely more on equations and prose, which are more ambiguous.
+#### (e) Human-in-the-loop or workflow paper
+Examples:
+- reviewer workflows
+- interactive translation systems
+- CAT integrations
+- approval loops
 
-### Step 4: Check for official code
+Most relevant surfaces:
+- human gates
+- reviewer fix application
+- bilingual memoQ flow
 
-Check `paper_metadata.json` for the `official_code` field. If official code repositories were found in Stage 1:
+#### (f) Infrastructure or system paper
+Examples:
+- serving, latency, compression, retrieval infrastructure
 
-1. **Verify the link** — open the URL. Confirm it's the authors' code for this paper, not an unrelated project or empty placeholder.
-2. **Note the framework** — is it PyTorch, JAX, TensorFlow? This may inform your implementation.
-3. **Note the repo structure** — what files exist? This helps you understand the implementation scope.
-4. **Do NOT read the code in detail yet** — that happens in Stage 3 when resolving ambiguities. At this stage, you just need to know it exists and what it covers.
+Most relevant only if it improves the current workflow without forcing a rewrite.
 
-Record the official code status in the contribution statement (Step 5).
+### Step 3: Identify the primary decision this paper could influence
 
-### Step 5: Identify what to implement vs. reference
+Ask:
 
-Make three lists:
+- Which current pain point could this paper improve?
+- Is the paper about discovery only, or could it inform an actual pipeline change?
+- Does it affect the standard 9-stage flow, the bilingual runner, the termbase, validators, or the research/vault layer?
 
-**IMPLEMENT** (we will write this code):
-- The core contribution (as identified in Step 2)
-- Any component described in enough detail to implement from the paper alone
+Prefer one primary decision. Secondary uses can be listed later.
 
-**REFERENCE** (we will import or note as dependency):
-- Standard components the paper uses but didn't invent (e.g., "standard transformer encoder")
-- Pre-trained models used as backbones
-- Existing techniques referenced with "following [X]" or "similar to [X]"
+### Step 4: Check domain fit early
 
-**OUT OF SCOPE** (we will not touch):
-- Baselines and comparison methods
-- Ablation variants (unless the user specifically requests full mode)
-- Dataset collection or annotation procedures
-- Deployment-specific optimizations
+Before going deeper, answer:
 
-### Step 6: Write the contribution statement
+- Does the paper deal with document translation, sentence translation, terminology, QA, workflow, or something only loosely related?
+- Is it multilingual, English-centric, or language-pair-specific?
+- Is there any sign of Icelandic, morphologically rich languages, legal/regulatory text, or document-delivery constraints?
 
-Write a structured contribution statement and save it to `contribution.md`:
+If the paper is only weakly related, say so directly. Weak relevance is a real result.
+
+### Step 5: Identify candidate insertion points
+
+Map the paper to at most three concrete surfaces such as:
+
+- outline generation
+- chunking
+- term extraction / term review
+- translation prompts
+- bilingual batching / memoQ handling
+- QA / validator layer
+- final document assembly
+- vault-based literature note or discovery workflow
+
+If you cannot map it to a concrete surface, the paper is probably `WATCHLIST` or `REJECT`.
+
+### Step 6: Record official code status
+
+If `paper_metadata.json` contains `official_code`:
+
+1. Verify the repository is actually for this paper.
+2. Record what it appears to cover.
+3. Treat it as reproducibility evidence, not proof that the method fits production.
+
+### Step 7: Write the contribution memo
+
+Save this structure to `.paper2code_work/{ARXIV_ID}/contribution.md`:
 
 ```markdown
 # Contribution Analysis
@@ -119,58 +155,39 @@ Write a structured contribution statement and save it to `contribution.md`:
 {authors}
 arxiv: {id}
 
-## One-sentence summary
-{what this paper does in one sentence}
+## One-sentence contribution
+{precise statement}
 
 ## Paper type
-{(a)-(f) classification with justification}
+{category with justification}
 
-## Core contribution to implement
-{One paragraph describing exactly what we will implement, referencing specific paper sections}
+## Primary pipeline decision it could influence
+{one paragraph}
 
-## Algorithm specification
-{Whether an Algorithm box exists, and if so, which one is the primary specification}
+## Relevance to translation-pipeline
+- Strength of relevance: {direct | indirect | weak}
+- Why: {brief explanation}
+
+## Candidate insertion points
+1. {surface} — {why}
+2. {surface} — {why}
+3. {surface} — {why}
 
 ## Official code
-{URL if found, or "None found"}
-{Framework used in official code, if applicable}
-{Brief note on what the official repo covers}
+{URL or "None found"}
+{what it appears to contain}
 
-## Implementation scope
-### Will implement:
-- {item 1 — with paper section reference}
-- {item 2 — with paper section reference}
-
-### Will reference (not reimplement):
-- {item 1 — what it is, where to get it}
-
-### Out of scope:
-- {item 1 — why}
-
-## Key sections for implementation
-1. {Section X.Y — what it specifies}
-2. {Section X.Y — what it specifies}
-3. {Appendix A — what it specifies}
+## Initial read
+- Most promising aspect:
+- Biggest fit risk:
+- Biggest unanswered question:
 ```
 
-### Step 7: Self-check
+### Step 8: Self-check
 
-Before proceeding:
-- Could a competent ML engineer read my contribution statement and know exactly what to build? If not, it's too vague.
-- Have I identified the paper type correctly? Read the abstract one more time.
-- Have I checked the appendices for additional specification of the core contribution?
-- Is there anything in my "IMPLEMENT" list that the paper doesn't actually describe in enough detail? Move it to "REFERENCE" or flag it.
+Before continuing:
 
----
-
-## Common mistakes at this stage
-
-1. **Trying to implement everything.** A paper about a new loss function doesn't need you to reimplement the backbone architecture. Import it.
-
-2. **Misidentifying the contribution.** A paper might describe a new architecture but the actual contribution is the training recipe. Read what the authors claim, not what takes up the most pages.
-
-3. **Ignoring paper type effects on scope.** The same checklist item (e.g., "training loop") can be in-scope or out-of-scope depending on the paper type. A training method paper MUST include the training loop. An architecture paper doesn't need more than a minimal example.
-
-4. **Skipping the Algorithm box.** If Algorithm 1 exists and you don't read it carefully, you will implement based on noisy prose instead of the precise specification.
-
-5. **Ignoring official code.** Stage 1 automatically searches for code links, but you must verify them in Step 4. If official code exists and you skip it, you'll waste time on ambiguities that the authors already resolved.
+- Could someone who knows the translation-pipeline read this and know why the paper matters?
+- Did you identify real insertion points, not vague aspirations?
+- Did you overstate relevance because the paper sounds modern or strong?
+- If the paper is weakly related, did you say that plainly?
